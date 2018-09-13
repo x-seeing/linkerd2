@@ -1,7 +1,6 @@
 package srv
 
 import (
-	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -133,9 +132,15 @@ func (h *handler) handleApiTap(w http.ResponseWriter, req *http.Request, p httpr
 		renderJsonError(w, err, http.StatusInternalServerError)
 		return
 	}
+	log.Info("websocket connection upgraded")
 	defer func() {
-		log.Info("closing websocket connection")
-		ws.Close()
+		log.Infof("waiting for client to close")
+		select {
+		case <-req.Context().Done():
+			log.Infof("client closed websocket connection v2")
+		case <-time.After(5 * time.Second):
+			log.Infof("timed out waiting for client to close")
+		}
 	}()
 
 	messageType, message, err := ws.ReadMessage()
@@ -155,6 +160,7 @@ func (h *handler) handleApiTap(w http.ResponseWriter, req *http.Request, p httpr
 		websocketError(ws, websocket.CloseInternalServerErr, err.Error())
 		return
 	}
+	log.Infof("websocket request message read: %+v", requestParams)
 
 	tapReq, err := util.BuildTapByResourceRequest(requestParams)
 	if err != nil {
@@ -167,37 +173,60 @@ func (h *handler) handleApiTap(w http.ResponseWriter, req *http.Request, p httpr
 		websocketError(ws, websocket.CloseInternalServerErr, err.Error())
 		return
 	}
-	defer tapClient.CloseSend()
+
+	events := make(chan []byte)
 
 	go func() {
+		defer func() {
+			log.Info("closing tap client")
+			err := tapClient.CloseSend()
+			if err != nil {
+				log.Infof("tap client close failed: %s", err)
+			}
+		}()
+
 		for {
 			rsp, err := tapClient.Recv()
 			if err == io.EOF {
+				log.Infof("tap server closed stream")
+				close(events)
 				return
 			}
 			if err != nil {
-				log.Errorf("Receive error: %s", err)
+				log.Infof("unexpected error reading tap event: %s", err)
+				close(events)
 				return
 			}
-
-			buf := new(bytes.Buffer)
-			err = pbMarshaler.Marshal(buf, rsp)
+			str, err := pbMarshaler.MarshalToString(rsp)
 			if err != nil {
-				websocketError(ws, websocket.CloseInternalServerErr, err.Error())
-				return
+				log.Infof("unexpected error serializing tap event: %s", err)
+				continue
 			}
+			events <- []byte(str)
+		}
+	}()
 
+	go func() {
+		defer func() {
+			log.Info("writer closing websocket connection")
+			// ws.Close()
+		}()
+
+		for {
 			select {
-			case <-req.Context().Done():
-				log.Infof("HTTP request context closed")
-				return
-			default:
-				if err := ws.WriteMessage(websocket.TextMessage, []byte(buf.String())); err != nil {
-					if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure) {
-						log.Errorf("Unexpected close error, write side: %s", err)
-					}
-					break
+			case event := <-events:
+				log.Infof("about to write websocket message")
+				err := ws.WriteMessage(websocket.TextMessage, event)
+				if err != nil {
+					log.Infof("error writing message: %s", err)
+					return
 				}
+				log.Infof("message written successfully")
+
+			case <-req.Context().Done():
+				log.Infof("client closed websocket connection")
+				return
+
 			}
 		}
 	}()
@@ -205,8 +234,12 @@ func (h *handler) handleApiTap(w http.ResponseWriter, req *http.Request, p httpr
 	for {
 		_, _, err := ws.ReadMessage()
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure) {
-				log.Errorf("Unexpected close error, read side: %s", err)
+			if err == io.EOF {
+				log.Infof("EOF received")
+			} else if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure) {
+				log.Errorf("unexpected close : %s", err)
+			} else {
+				log.Infof("other error received: %s", err)
 			}
 			break
 		}

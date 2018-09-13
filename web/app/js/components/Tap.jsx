@@ -46,7 +46,7 @@ class Tap extends React.Component {
       },
       maxLinesToDisplay: 40,
       tapRequestInProgress: false,
-      pollingInterval: 10000,
+      pollingInterval: 100000,
       pendingRequests: false
     };
   }

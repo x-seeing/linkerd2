@@ -36,7 +36,7 @@ class Top extends React.Component {
         authority: "",
         maxRps: ""
       },
-      pollingInterval: 10000,
+      pollingInterval: 100000,
       tapRequestInProgress: false,
       pendingRequests: false
     };

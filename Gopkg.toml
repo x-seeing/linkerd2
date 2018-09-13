@@ -50,7 +50,7 @@ required = ["github.com/golang/protobuf/protoc-gen-go"]
 
 [[constraint]]
   name = "github.com/gorilla/websocket"
-  version = "1.2.0"
+  version = "v1.4.0"
 #
 # k8s.io/kubernetes dependency fixes
 # taken from https://github.com/kubernetes/kubernetes/blob/master/Godeps/Godeps.json
