@@ -59,13 +59,15 @@ func generateBaseKubernetesApiUrl(schemeHostAndPort string) (*url.URL, error) {
 }
 
 func getConfig(fpath string) (*rest.Config, error) {
-	rules := clientcmd.NewDefaultClientConfigLoadingRules()
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	loadingRules.DefaultClientConfig = &clientcmd.DefaultClientConfig
 	if fpath != "" {
-		rules.ExplicitPath = fpath
+		loadingRules.ExplicitPath = fpath
 	}
+	// overrides := &clientcmd.ConfigOverrides{ClusterDefaults: clientcmd.ClusterDefaults}
 	overrides := &clientcmd.ConfigOverrides{}
 	return clientcmd.
-		NewNonInteractiveDeferredLoadingClientConfig(rules, overrides).
+		NewNonInteractiveDeferredLoadingClientConfig(loadingRules, overrides).
 		ClientConfig()
 }
 
