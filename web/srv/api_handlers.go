@@ -25,11 +25,7 @@ type (
 var (
 	defaultResourceType = k8s.Deployment
 	pbMarshaler         = jsonpb.Marshaler{EmitDefaults: true}
-	maxMessageSize      = 2048
-	websocketUpgrader   = websocket.Upgrader{
-		ReadBufferSize:  maxMessageSize,
-		WriteBufferSize: maxMessageSize,
-	}
+	websocketUpgrader   = websocket.Upgrader{}
 )
 
 func renderJsonError(w http.ResponseWriter, err error, status int) {
@@ -123,7 +119,7 @@ func websocketError(ws *websocket.Conn, wsError int, msg string) {
 	log.Infof("sending websocket close %d: %s", wsError, msg)
 	ws.WriteControl(websocket.CloseMessage,
 		websocket.FormatCloseMessage(wsError, msg),
-		time.Time{})
+		time.Now().Add(time.Second))
 }
 
 func (h *handler) handleApiTap(w http.ResponseWriter, req *http.Request, p httprouter.Params) {
@@ -133,14 +129,16 @@ func (h *handler) handleApiTap(w http.ResponseWriter, req *http.Request, p httpr
 		return
 	}
 	log.Info("websocket connection upgraded")
+
+	closeHandler := func(code int, text string) error {
+		websocketError(ws, code, "")
+		return nil
+	}
+	ws.SetCloseHandler(closeHandler)
+
 	defer func() {
-		log.Infof("waiting for client to close")
-		select {
-		case <-req.Context().Done():
-			log.Infof("client closed websocket connection v2")
-		case <-time.After(5 * time.Second):
-			log.Infof("timed out waiting for client to close")
-		}
+		log.Info("reader closing websocket connection")
+		ws.Close()
 	}()
 
 	messageType, message, err := ws.ReadMessage()
@@ -209,7 +207,7 @@ func (h *handler) handleApiTap(w http.ResponseWriter, req *http.Request, p httpr
 	go func() {
 		defer func() {
 			log.Info("writer closing websocket connection")
-			// ws.Close()
+			ws.Close()
 		}()
 
 		for {
@@ -245,5 +243,5 @@ func (h *handler) handleApiTap(w http.ResponseWriter, req *http.Request, p httpr
 		}
 	}
 
-	websocketError(ws, websocket.CloseNormalClosure, "")
+	// websocketError(ws, websocket.CloseNormalClosure, "")
 }

@@ -8,6 +8,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/kubectl/proxy"
+
 	// Load all the auth plugins for the cloud providers.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
@@ -60,13 +61,13 @@ func (kp *KubernetesProxy) URLFor(namespace string, extraPathStartingWithSlash s
 }
 
 func proxyCreate(config *rest.Config) (*proxy.Server, error) {
-	filter := &proxy.FilterServer{
-		AcceptPaths:   proxy.MakeRegexpArrayOrDie(proxy.DefaultPathAcceptRE),
-		RejectPaths:   proxy.MakeRegexpArrayOrDie(proxy.DefaultPathRejectRE),
-		AcceptHosts:   proxy.MakeRegexpArrayOrDie(proxy.DefaultHostAcceptRE),
-		RejectMethods: proxy.MakeRegexpArrayOrDie(proxy.DefaultMethodRejectRE),
-	}
-	server, err := proxy.NewServer("", "/", "/static/", filter, config)
+	// filter := &proxy.FilterServer{
+	// 	AcceptPaths:   proxy.MakeRegexpArrayOrDie(proxy.DefaultPathAcceptRE),
+	// 	RejectPaths:   proxy.MakeRegexpArrayOrDie(proxy.DefaultPathRejectRE),
+	// 	AcceptHosts:   proxy.MakeRegexpArrayOrDie(proxy.DefaultHostAcceptRE),
+	// 	RejectMethods: proxy.MakeRegexpArrayOrDie(proxy.DefaultMethodRejectRE),
+	// }
+	server, err := proxy.NewServer("", "/", "/static/", nil, config)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create proxy server: %+v", err)
 	}
