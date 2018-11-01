@@ -89,37 +89,26 @@ func TestInstall(t *testing.T) {
 	}
 
 	// Tests Services
-	err = TestHelper.RetryFor(10*time.Second, func() error {
-		for _, svc := range linkerdSvcs {
-			if err := TestHelper.CheckService(TestHelper.GetLinkerdNamespace(), svc); err != nil {
-				return fmt.Errorf("Error validating service [%s]:\n%s", svc, err)
-			}
+	for _, svc := range linkerdSvcs {
+		if err := TestHelper.CheckService(TestHelper.GetLinkerdNamespace(), svc); err != nil {
+			t.Error(fmt.Errorf("Error validating service [%s]:\n%s", svc, err))
 		}
-		return nil
-	})
-	if err != nil {
-		t.Error(err)
 	}
 
 	// Tests Pods and Deployments
-	err = TestHelper.RetryFor(2*time.Minute, func() error {
-		for deploy, replicas := range linkerdDeployReplicas {
-			if err := TestHelper.CheckPods(TestHelper.GetLinkerdNamespace(), deploy, replicas); err != nil {
-				return fmt.Errorf("Error validating pods for deploy [%s]:\n%s", deploy, err)
-			}
-			if err := TestHelper.CheckDeployment(TestHelper.GetLinkerdNamespace(), deploy, replicas); err != nil {
-				return fmt.Errorf("Error validating deploy [%s]:\n%s", deploy, err)
-			}
+	for deploy, replicas := range linkerdDeployReplicas {
+		if err := TestHelper.CheckPods(TestHelper.GetLinkerdNamespace(), deploy, replicas); err != nil {
+			t.Error(fmt.Errorf("Error validating pods for deploy [%s]:\n%s", deploy, err))
 		}
-		return nil
-	})
-	if err != nil {
-		t.Error(err)
+		if err := TestHelper.CheckDeployment(TestHelper.GetLinkerdNamespace(), deploy, replicas); err != nil {
+			t.Error(fmt.Errorf("Error validating deploy [%s]:\n%s", deploy, err))
+		}
 	}
+
 }
 
 func TestVersionPostInstall(t *testing.T) {
-	err := TestHelper.RetryFor(30*time.Second, func() error {
+	err := TestHelper.RetryFor(func() error {
 		return TestHelper.CheckVersion(TestHelper.GetVersion())
 	})
 	if err != nil {
@@ -130,7 +119,7 @@ func TestVersionPostInstall(t *testing.T) {
 func TestCheckPostInstall(t *testing.T) {
 	var out string
 	var err error
-	overallErr := TestHelper.RetryFor(30*time.Second, func() error {
+	overallErr := TestHelper.RetryFor(func() error {
 		out, _, err = TestHelper.LinkerdRun("check", "--expected-version", TestHelper.GetVersion())
 		return err
 	})
